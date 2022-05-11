@@ -100,3 +100,4 @@ if __name__ == '__main__':
             produto.salvar_codigo()
 
     subprocess.run(['explorer.exe', Path('output')])
+    subprocess.run(['notepad', Path('log.txt')])
