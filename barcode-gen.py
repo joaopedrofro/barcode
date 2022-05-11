@@ -1,29 +1,18 @@
 try:
-    # from PIL import Image
-    # from io import BytesIO
-    from fpdf import FPDF
-    import argparse
-    from os.path import abspath, splitext
     import barcode
+    import argparse
+    import subprocess
+    from fpdf import FPDF
+    from pathlib import Path
     from barcode.writer import ImageWriter
-except ImportError:
-    print("""\
-[ERROR] - [ImportError]
-
-* Para executar este programa é necessário instalar todas
-as dependências abaixo:
-    fpdf
-    Pillow
-    python-barcode
-
-* Execute o seguinte comando para instalar as dependências:
-    pip install -r requirements.txt
-""")
+except ImportError as error:
+    print("{}\n\nImportError: Para utilizar este script instale as dependências em requirements.txt".format(error))
+    print("\t# pip install -r requirements.txt")
     exit(0)
 
 
-def codigo_itf(codigo):
-    itf = '1700000' + codigo
+def itf_checksum(codigo):
+    itf = '17' + '0' * (11-len(codigo)) + codigo
     soma = 0
 
     for i in range(0, len(itf)):
@@ -38,70 +27,76 @@ def codigo_itf(codigo):
     return itf
 
 
-def criar_codigo_barras(codigo, descricao, tipo):
-    nome_arquivo = '{} - {}'.format(codigo, descricao)
+class Produto:
 
-    if tipo=='itf':
-        barcode.generate(
-            tipo,
-            codigo_itf(codigo),
-            writer=ImageWriter(),
-            output=nome_arquivo,
-            writer_options={
-                'module_width': 0.2,
-                'module_height': 11.0,
-                'font_size': 12,
-                'text_distance': 1.0
-            }
-        )
-    else:
-        barcode.generate(
-            tipo,
-            '700000' + codigo,
-            writer=ImageWriter(),
-            output=nome_arquivo,
-            writer_options={
-                'module_width': 0.3,
-                'module_height': 11.0,
-                'font_size': 12,
-                'text_distance': 1.0
-            }
-        )
+    def __init__(self, reduzido, descricao):
+        self.reduzido = reduzido
+        self.descricao = descricao
+       
+    def gerar_codigo(self, tipo):
+        codigo_barras_cru = ''
 
-    pdf = FPDF('P', unit='mm', format='A4')
-    pdf.add_page()
-    pdf.set_font('Arial', 'B', 12)
-    pdf.cell(0, 0, descricao, align='C')
-    pdf.image('{}.png'.format(nome_arquivo), x=70, y=13, w=70, type="PNG")
-    pdf.output('{}.pdf'.format(nome_arquivo), 'F')
+        if tipo == 'itf':
+            codigo_barras_cru = itf_checksum(self.reduzido)
+        else:
+            codigo_barras_cru = '7' + '0' * (11-len(self.reduzido)) + self.reduzido
 
+        self.codigo_barras = barcode.get_barcode(tipo, codigo_barras_cru, writer=ImageWriter())
 
+    def salvar_codigo(self):
+        log = Path('log.txt')
+        pasta = Path('output')
+        nome_arquivo = pasta / '{} - {}'.format(self.reduzido, self.descricao)
 
-def codigo_descricao(texto):
-    codigo, descricao = texto.replace('\n', '').split('-')
-    codigo = codigo.lstrip().rstrip()
-    descricao = descricao.lstrip().rstrip()
-    return codigo, descricao
+        if not pasta.exists():
+            pasta.mkdir()
+
+        with log.open('a') as log_file:
+            self.codigo_barras.save(
+                nome_arquivo,
+                options={
+                    'module_width': 0.3,
+                    'module_height': 11.0,
+                    'font_size': 12,
+                    'text_distance': 1.0
+                }
+            )
+
+            log_file.write(
+                '{} - {} - {}\n'.format(
+                    self.reduzido,
+                    self.codigo_barras.get_fullcode(),
+                    self.descricao
+                )
+            )
+
+            pdf = FPDF('P', unit='mm', format='A4')
+            pdf.add_page()
+            pdf.set_font('Arial', 'B', 12)
+            pdf.cell(0, 0, self.descricao, align='C')
+            pdf.image('{}.png'.format(nome_arquivo), x=70, y=13, w=70, type="PNG")
+            pdf.output('{}.pdf'.format(nome_arquivo), 'F')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='Barcode Generator', description='Script que gera códigos de barras em PDF e PNG.')
-    parser.add_argument('--arquivo', '-a', help="Informe o nome ou caminho de um arquivo que contenha os códigos separados por uma nova linha.")
     parser.add_argument('--tipo', '-t', help="Informe o tipo do código de barras a ser gerado", default="ean13")
-    parser.add_argument('--descricao', '-d', help="Adiciona a descrição do código acima do código de barras", action='store_true')
     args = parser.parse_args()
 
-    if args.arquivo:
-        if splitext(abspath(args.arquivo))[1] == '.txt':
-            # try:
-            arquivo = open(abspath(args.arquivo), 'r')
-            codigos = arquivo.readlines()
-            arquivo.close()
-            for codigo in codigos:
-                codigo_txt, descricao = codigo_descricao(codigo)
-                criar_codigo_barras(codigo_txt, descricao, args.tipo)
-            # except:
-            #     print('Não foi possível ler o arquivo!')
-        else:
-            print('Arquivo inválido!')
-            exit(0)
+    codigos = Path('codigos.txt')
+
+    if not codigos.exists():
+        codigos.touch()
+
+    subprocess.run(['notepad', codigos])
+
+    with codigos.open('r') as arquivo:
+        for linha in arquivo.readlines():
+            reduzido, descricao = linha.replace('\n', '').split('-')
+            reduzido = reduzido.lstrip().rstrip()
+            descricao = descricao.lstrip().rstrip()
+            produto = Produto(reduzido, descricao)
+            produto.gerar_codigo(args.tipo)
+            produto.salvar_codigo()
+
+    subprocess.run(['explorer.exe', Path('output')])
