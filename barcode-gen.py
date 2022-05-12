@@ -51,36 +51,44 @@ class Produto:
         if not pasta.exists():
             pasta.mkdir()
 
+        self.codigo_barras.save(
+            nome_arquivo,
+            options={
+                'module_width': 0.3,
+                'module_height': 11.0,
+                'font_size': 12,
+                'text_distance': 1.0
+            }
+        )
+
+        pdf = FPDF('P', unit='mm', format='A4')
+        pdf.add_page()
+        pdf.set_font('Arial', 'B', 12)
+        pdf.cell(0, 0, self.descricao, align='C')
+        pdf.image('{}.png'.format(nome_arquivo), x=70, y=13, w=70, type="PNG")
+        pdf.output('{}.pdf'.format(nome_arquivo), 'F')
+
         with log.open('a') as log_file:
-            self.codigo_barras.save(
-                nome_arquivo,
-                options={
-                    'module_width': 0.3,
-                    'module_height': 11.0,
-                    'font_size': 12,
-                    'text_distance': 1.0
-                }
+            log_file.write('{} - {} - {}\n'.format(
+                self.reduzido,
+                self.codigo_barras.get_fullcode(),
+                self.descricao)
             )
-
-            log_file.write(
-                '{} - {} - {}\n'.format(
-                    self.reduzido,
-                    self.codigo_barras.get_fullcode(),
-                    self.descricao
-                )
-            )
-
-            pdf = FPDF('P', unit='mm', format='A4')
-            pdf.add_page()
-            pdf.set_font('Arial', 'B', 12)
-            pdf.cell(0, 0, self.descricao, align='C')
-            pdf.image('{}.png'.format(nome_arquivo), x=70, y=13, w=70, type="PNG")
-            pdf.output('{}.pdf'.format(nome_arquivo), 'F')
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(prog='Barcode Generator', description='Script que gera códigos de barras em PDF e PNG.')
-    parser.add_argument('--tipo', '-t', help="Informe o tipo do código de barras a ser gerado", default="ean13")
+    parser = argparse.ArgumentParser(
+        prog='Barcode Generator',
+        description='Script que gera códigos de barras em PDF e PNG.'
+    )
+
+    parser.add_argument(
+        '--tipo',
+        '-t',
+        help="Informe o tipo do código de barras a ser gerado",
+        default="ean13"
+    )
+
     args = parser.parse_args()
 
     codigos = Path('codigos.txt')
@@ -88,16 +96,22 @@ if __name__ == '__main__':
     if not codigos.exists():
         codigos.touch()
 
-    subprocess.run(['notepad', codigos])
+    subprocess.run(['notepad.exe', codigos])
 
     with codigos.open('r') as arquivo:
         for linha in arquivo.readlines():
-            reduzido, descricao = linha.replace('\n', '').split('-')
-            reduzido = reduzido.lstrip().rstrip()
-            descricao = descricao.lstrip().rstrip()
-            produto = Produto(reduzido, descricao)
-            produto.gerar_codigo(args.tipo)
-            produto.salvar_codigo()
+            if linha != '':
+                reduzido, descricao = linha.replace('\n', '').split('-')
+                reduzido = reduzido.lstrip().rstrip()
+                descricao = descricao.lstrip().rstrip()
+
+                produto = Produto(reduzido, descricao)
+                produto.gerar_codigo(args.tipo)
+                produto.salvar_codigo()
 
     subprocess.run(['explorer.exe', Path('output')])
+<<<<<<< HEAD
     subprocess.run(['notepad', Path('log.txt')])
+=======
+    subprocess.run(['notepad.exe', Path('log.txt')])
+>>>>>>> 8f64efe470d3777cea68a1439fcee5b9a2a0dd66
