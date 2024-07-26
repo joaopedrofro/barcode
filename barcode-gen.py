@@ -20,7 +20,7 @@ class Barcode:
         self.code = code
         self.description = description
         self.format = barcode_format
-        self.writer_options = barcode.base.Barcode.default_writer_options
+        self.writer_options = {}
         
         format_code = code
         match barcode_format:
@@ -35,11 +35,11 @@ class Barcode:
                 self.writer_options['module_width'] = 0.4
                 self.writer_options['text_distance'] = 4.6
                 self.writer_options['module_height'] = 11.0
-            case "itf":
+            case "ean14":
                 format_code = '17' + '0' * (11-len(code)) + code
-                self.writer_options['font_size'] = 16
-                self.writer_options['module_width'] = 0.32
-                self.writer_options['text_distance'] = 7.5
+                self.writer_options['module_width'] = 0.6
+                self.writer_options['font_size'] = 14
+                self.writer_options['text_distance'] = 7
             
         self.barcode = barcode.get_barcode_class(self.format)(format_code)
         self.barcode.writer = ImageWriter()
@@ -72,8 +72,7 @@ class BarcodeService:
                 lf.write('{} - {} - {}\n'.format(
                     out_barcode.code,
                     out_barcode.barcode.get_fullcode(),
-                    out_barcode.description)
-                )
+                    out_barcode.description))
         
     def get_barcodes_from_file(self, file) -> list:
         lines = []
@@ -93,26 +92,29 @@ class BarcodeService:
 
 
 if __name__ == '__main__':
-    print("Escolha o formato do código de barras a ser gerado: \n")
     
     provided_barcodes = {
         1: 'code128',
         2: 'ean13',
-        3: 'itf'
+        3: 'ean14'
     }
     
-    for k, v in provided_barcodes.items():
-        print("{} - {}".format(k, v))
-        
     barcode_format = ""
     
-    try:
-        barcode_format = provided_barcodes[int(input("\nDigite: "))]
-    except (ValueError, IndexError):
-        print("Valor inválido!")
-        input()
-        exit(0)
-    
+    while True:
+        print("Escolha o formato do código de barras a ser gerado: \n")
+        
+        for k, v in provided_barcodes.items():
+            print("{} - {}".format(k, v.upper()))
+            
+        try:
+            barcode_format = provided_barcodes[int(input("\nOpção: "))]
+            break
+        except (ValueError, IndexError, KeyboardInterrupt, KeyError):
+            print("\nValor inválido!")
+            input("\nPressione enter para tentar novamente...")
+            print()
+        
     input_file = Path('codigos.txt')
     
     if not input_file.exists():
