@@ -12,17 +12,13 @@ except ImportError as error:
     exit(0)
 
 
-def get_barcodes(code_lines, barcode_format="code128"):
+def get_barcodes(code_lines, barcode_format):
     barcode_list = []
     
     for line in code_lines.copy():
         code, description = line.replace("\n", "").split("-")
         code = code.strip()
         description = description.strip()
-        
-        if barcode_format == "ean13":
-            code = '7' + '0' * (11-len(code)) + code
-
         barcode_list.append(Barcode(code, description, barcode_format))
     
     return barcode_list
@@ -44,7 +40,10 @@ class Barcode:
         self.code = code
         self.description = description
         self.format = barcode_format
-        self.barcodefull = barcode.get_barcode_class(self.format)(self.code)
+        new_code = code
+        if barcode_format == "ean13":
+            new_code = '7' + '0' * (11-len(code)) + code
+        self.barcodefull = barcode.get_barcode_class(self.format)(new_code)
         self.barcodefull.writer = ImageWriter()
 
 
